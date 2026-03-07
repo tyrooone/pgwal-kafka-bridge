@@ -1,0 +1,39 @@
+{
+  "name": "pgwal-kafka-bridge",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "PostgreSQL WAL to Kafka bridge via logical replication",
+  "main": "build/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node build/index.js",
+    "dev:check": "tsc --noEmit",
+    "dev:watch": "tsc --watch",
+    "prepare": "husky"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tyrooone/pgwal-kafka-bridge.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/tyrooone/pgwal-kafka-bridge/issues"
+  },
+  "homepage": "https://github.com/tyrooone/pgwal-kafka-bridge#readme",
+  "dependencies": {
+    "@platformatic/kafka": "1.29.0",
+    "dotenv": "17.3.1",
+    "env-var": "7.5.0",
+    "pg": "8.20.0",
+    "pg-logical-replication": "2.3.0",
+    "pino": "10.3.1"
+  },
+  "devDependencies": {
+    "@types/pg": "8.18.0",
+    "husky": "9.1.7",
+    "tsconfig-paths": "4.2.0",
+    "typescript": "5.9.3"
+  }
+}
