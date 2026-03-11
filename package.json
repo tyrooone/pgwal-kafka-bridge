@@ -1,6 +1,6 @@
 {
   "name": "pgwal-kafka-bridge",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "description": "PostgreSQL WAL to Kafka bridge via logical replication",
   "main": "build/index.js",
