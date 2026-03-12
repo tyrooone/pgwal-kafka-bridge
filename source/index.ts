@@ -6,12 +6,34 @@ import { Server } from './server.ts';
 import type { TableTarget } from './types.ts';
 
 /**
+ * Kafka producer stream with built-in batching
+ */
+const producerStream = Producer.asStream({
+  batchSize: Config.kafka.batch.size,
+  batchTime: Config.kafka.batch.time,
+  highWaterMark: Config.kafka.batch.size,
+  reportMode: 'batch',
+});
+
+producerStream.on('error', (error) => {
+  Logger.error({ error }, 'producer stream error');
+});
+
+producerStream.on('flush', ({ count, duration, result }) => {
+  const uniqueTopics = new Set(result.offsets?.map((o: { topic: string }) => o.topic));
+  const topicsList = Array.from(uniqueTopics)
+  Logger.info({ count, duration, topics: topicsList }, 'batch flushed');
+});
+
+/**
  * Graceful shutdown
  */
-const onShutdown = () => {
+const onShutdown = async () => {
   Server.close();
-  Replication.stop();
-  Producer.close().then(() => process.exit(0));
+  await Replication.stop();
+  await producerStream.close();
+  Producer.close();
+  process.exit(0);
 }
 
 /**
@@ -61,23 +83,17 @@ Replication.on('data', async (_, msg) => {
   }));
   if (matchedTargets.length === 0) return;
 
-  const messages = matchedTargets.map((target) => ({
-    topic: target.topic,
-    key: String(row[target.partitionKey]),
-    value: payload,
-  }));
+  for (const target of matchedTargets) {
+    const ok = producerStream.write({
+      topic: target.topic,
+      key: String(row[target.partitionKey]),
+      value: payload,
+    });
 
-  Logger.info({
-    operation: msg.tag,
-    table: `${msg.relation.schema}.${msg.relation.name}`,
-    topics: messages.map((m) => m.topic),
-    keys: messages.map((m) => m.key),
-  }, 'wal event');
-
-  const result = await Producer.send({ messages });
-  const offsets = result.offsets?.map((o) => ({ topic: o.topic, partition: o.partition, offset: String(o.offset) }))
-
-  Logger.info({ partitions: offsets }, 'produced');
+    if (!ok) {
+      await new Promise<void>((resolve) => producerStream.once('drain', resolve));
+    }
+  }
 });
 
 //

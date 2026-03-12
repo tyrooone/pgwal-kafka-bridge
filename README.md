@@ -38,6 +38,8 @@ npm start
 | `KAFKA_BROKERS` | Брокеры Kafka через запятую | — |
 | `KAFKA_USERNAME` | SASL username | — |
 | `KAFKA_PASSWORD` | SASL password | — |
+| `KAFKA_BATCH_SIZE` | Количество сообщений в батче | `100` |
+| `KAFKA_BATCH_TIME` | Таймаут сброса батча (мс) | `100` |
 | `BRIDGE_TABLES` | JSON-массив таблиц и маршрутов (см. ниже) | — |
 
 ### Формат BRIDGE_TABLES

@@ -8,6 +8,9 @@ export const Replication = new LogicalReplicationService({
     auto: true,
     timeoutSeconds: 10,
   },
+  flowControl: {
+    enabled: true,
+  },
 });
 
 export const Plugin = new PgoutputPlugin({
