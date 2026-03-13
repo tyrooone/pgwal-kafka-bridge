@@ -6,6 +6,7 @@ export const Config = {
   port: env.get('PORT').default(5430).asPortNumber(),
   postgres: {
     url: env.get('PG_URL').required().asUrlString(),
+    reject: env.get('PG_REJECT').asBoolStrict(),
     slotName: env.get('PG_SLOT_NAME').required().asString(),
     pubName: env.get('PG_PUB_NAME').required().asString(),
   },

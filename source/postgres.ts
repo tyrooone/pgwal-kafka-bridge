@@ -3,6 +3,9 @@ import { Config } from './config.ts';
 
 export const Replication = new LogicalReplicationService({
   connectionString: Config.postgres.url,
+  ssl: {
+    rejectUnauthorized: Config.postgres.reject,
+  },
 }, {
   acknowledge: {
     auto: true,
