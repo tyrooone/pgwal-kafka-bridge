@@ -1,6 +1,7 @@
 import { Config } from './config.ts';
 import { Producer } from './kafka.ts';
 import { Logger } from './logger.ts';
+import { migrate } from './migrate.ts';
 import { Plugin, Replication } from './postgres.ts';
 import { Server } from './server.ts';
 import type { TableTarget } from './types.ts';
@@ -104,8 +105,10 @@ Replication.on('error', (error) => {
 });
 
 //
-// Start replication
+// Run migrations and start replication
 //
+await migrate();
+
 Logger.info({ tables: Config.tables.map((t) => t.table) }, 'watching tables');
 
 Replication.subscribe(Plugin, Config.postgres.slotName).catch((error) => {

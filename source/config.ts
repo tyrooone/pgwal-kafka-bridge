@@ -12,8 +12,9 @@ export const Config = {
   },
   kafka: {
     brokers: env.get('KAFKA_BROKERS').required().asArray(','),
-    username: env.get('KAFKA_USERNAME').asString(),
-    password: env.get('KAFKA_PASSWORD').asString(),
+    username: env.get('KAFKA_USERNAME').required().asString(),
+    password: env.get('KAFKA_PASSWORD').required().asString(),
+    partitions: env.get('KAFKA_PARTITIONS_COUNT').asIntPositive(),
     batch: {
       size: env.get('KAFKA_BATCH_SIZE').default(100).asIntPositive(),
       time: env.get('KAFKA_BATCH_TIME').default(100).asIntPositive(),

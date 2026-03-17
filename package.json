@@ -1,6 +1,6 @@
 {
   "name": "pgwal-kafka-bridge",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "type": "module",
   "description": "PostgreSQL WAL to Kafka bridge via logical replication",
   "main": "build/index.js",
@@ -29,7 +29,8 @@
     "env-var": "7.5.0",
     "pg": "8.20.0",
     "pg-logical-replication": "2.3.0",
-    "pino": "10.3.1"
+    "pino": "10.3.1",
+    "radash": "12.1.1"
   },
   "devDependencies": {
     "@types/pg": "8.18.0",

@@ -1,0 +1,96 @@
+networks:
+  bridge_network:
+
+volumes:
+  postgres_volume:
+  kafka_volume:
+
+services:
+  #
+  # POSTGRES
+  #
+  postgres-storage:
+    image: postgres:18.3
+    container_name: bridge-postgres-storage
+    networks:
+      - bridge_network
+    hostname: postgres.storage.bridge
+    ports:
+      - 2954:5432
+    volumes:
+      - postgres_volume:/var/lib/postgresql
+      - ./.docker/config/postgresql.conf:/etc/postgresql.conf:ro
+      - ./.docker/scripts/migration.sql:/docker-entrypoint-initdb.d/migration.sql:ro
+    command: ["postgres", "-c", "config_file=/etc/postgresql.conf"]
+    environment:
+      POSTGRES_PASSWORD: 8FpAVseS8dkxeYLy
+      POSTGRES_USER: bridge
+      POSTGRES_DB: bridge
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bridge -t 10"]
+      interval: 10s
+      timeout: 1s
+      retries: 2
+
+  postgres-client:
+    image: sosedoff/pgweb:0.17.0
+    container_name: bridge-postgres-client
+    networks:
+      - bridge_network
+    ports:
+      - 2958:8081
+    environment:
+      - PGWEB_DATABASE_URL=postgres://bridge:8FpAVseS8dkxeYLy@postgres.storage.bridge:5432/bridge?sslmode=disable
+    depends_on:
+      postgres-storage:
+        condition: service_healthy
+
+  #
+  # KAFKA
+  #
+  kafka-broker:
+    image: apache/kafka:3.9.0
+    container_name: bridge-kafka-broker
+    networks:
+      - bridge_network
+    hostname: kafka.broker.bridge
+    ports:
+      - 2994:2994
+    volumes:
+      - kafka_volume:/var/lib/kafka/data
+    environment:
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:2994
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka.broker.bridge:9092,EXTERNAL://localhost:2994
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:SASL_PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_NUM_PARTITIONS: 24
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_LISTENER_NAME_EXTERNAL_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_LISTENER_NAME_EXTERNAL_PLAIN_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="bridge" password="zLtS2AXdq2MXsYJK" user_bridge="zLtS2AXdq2MXsYJK";'
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 9092 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 2
+
+  kafka-console:
+    image: redpandadata/console:v3.5.1
+    container_name: bridge-kafka-console
+    networks:
+      - bridge_network
+    ports:
+      - 2991:9091
+    environment:
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+      KAFKA_BROKERS: kafka.broker.bridge:9092
+      SERVER_LISTENPORT: 9091
+    depends_on:
+      kafka-broker:
+        condition: service_healthy

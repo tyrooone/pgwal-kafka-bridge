@@ -1,12 +1,17 @@
 import { LogicalReplicationService, PgoutputPlugin } from 'pg-logical-replication';
 import { Config } from './config.ts';
+import type { ClientConfig } from 'pg';
 
-export const Replication = new LogicalReplicationService({
+export const PostgresConfig: ClientConfig = {
   connectionString: Config.postgres.url,
-  ssl: {
+}
+if (typeof Config.postgres.reject === 'boolean') {
+  PostgresConfig.ssl = {
     rejectUnauthorized: Config.postgres.reject,
-  },
-}, {
+  }
+}
+
+export const Replication = new LogicalReplicationService(PostgresConfig, {
   acknowledge: {
     auto: true,
     timeoutSeconds: 10,

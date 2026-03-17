@@ -40,6 +40,7 @@ npm start
 | `KAFKA_PASSWORD` | SASL password | — |
 | `KAFKA_BATCH_SIZE` | Количество сообщений в батче | `100` |
 | `KAFKA_BATCH_TIME` | Таймаут сброса батча (мс) | `100` |
+| `KAFKA_PARTITIONS_COUNT` | Количество партиций при создании топиков | `undefined` |
 | `BRIDGE_TABLES` | JSON-массив таблиц и маршрутов (см. ниже) | — |
 
 ### Формат BRIDGE_TABLES
@@ -73,69 +74,25 @@ max_wal_senders = 4
 
 Перезапустить PostgreSQL после изменений.
 
-### 2. Создать пользователя с правами репликации
+### 2. Создать пользователя с правами репликации (опционально)
 
 ```sql
 CREATE ROLE replicator WITH LOGIN PASSWORD 'secret' REPLICATION;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO replicator;
 ```
 
-### 3. Создать публикацию
+## Автоматические миграции
 
-Для конкретных таблиц:
+При запуске сервис автоматически создаёт и обновляет всю необходимую инфраструктуру на основе `BRIDGE_TABLES`, `PG_PUB_NAME` и `PG_SLOT_NAME`:
 
-```sql
-CREATE PUBLICATION pgwal_bridge_pub FOR TABLE orders, users;
-```
+**PostgreSQL:**
+- Создаёт публикацию (`CREATE PUBLICATION`) для таблиц из конфига
+- Если публикация уже существует — добавляет новые и убирает лишние таблицы (`ADD TABLE` / `DROP TABLE`)
+- Устанавливает `REPLICA IDENTITY FULL` для добавленных таблиц
+- Создаёт слот логической репликации, если его ещё нет
 
-Для всех таблиц:
-
-```sql
-CREATE PUBLICATION pgwal_bridge_pub FOR ALL TABLES;
-```
-
-### 4. Включить REPLICA IDENTITY FULL
-
-По умолчанию при `DELETE` в WAL попадают только значения primary key. Чтобы получать всю строку целиком:
-
-```sql
-ALTER TABLE orders REPLICA IDENTITY FULL;
-ALTER TABLE users REPLICA IDENTITY FULL;
-```
-
-### 5. Создать слот репликации
-
-```sql
-SELECT pg_create_logical_replication_slot('pgwal_bridge', 'pgoutput');
-```
-
-Проверить существующие слоты:
-
-```sql
-SELECT * FROM pg_replication_slots;
-```
-
-Удалить слот (если нужно пересоздать):
-
-```sql
-SELECT pg_drop_replication_slot('pgwal_bridge');
-```
-
-## Подготовка Kafka
-
-### Создать топики
-
-```bash
-kafka-topics.sh --bootstrap-server localhost:9092 \
-  --create --topic orders-by-user \
-  --partitions 6 --replication-factor 1
-
-kafka-topics.sh --bootstrap-server localhost:9092 \
-  --create --topic orders-by-region \
-  --partitions 6 --replication-factor 1
-```
-
-Количество партиций выбирается исходя из требуемого параллелизма консьюмеров.
+**Kafka:**
+- Создаёт недостающие топики с количеством партиций из `KAFKA_PARTITIONS_COUNT` (или значение по умолчанию из настройки брокера `KAFKA_NUM_PARTITIONS`)
 
 ## Количество экземпляров
 
@@ -143,16 +100,6 @@ kafka-topics.sh --bootstrap-server localhost:9092 \
 
 Если нужно масштабировать:
 
-- Создайте отдельный слот и публикацию для каждого экземпляра
+- Запустите отдельный экземпляр с уникальными `PG_SLOT_NAME` и `PG_PUB_NAME`
 - Разделите таблицы между экземплярами через `BRIDGE_TABLES`
-- Каждый экземпляр использует свой `PG_SLOT_NAME`
-
-```sql
--- Экземпляр 1: orders
-CREATE PUBLICATION pub_orders FOR TABLE orders;
-SELECT pg_create_logical_replication_slot('slot_orders', 'pgoutput');
-
--- Экземпляр 2: users
-CREATE PUBLICATION pub_users FOR TABLE users;
-SELECT pg_create_logical_replication_slot('slot_users', 'pgoutput');
-```
+- Публикации, слоты и топики создадутся автоматически при старте

@@ -14,3 +14,8 @@ export interface TableConfig {
   table: string
   targets: TableTarget[]
 }
+
+export interface TablePublication {
+  schemaname: string
+  tablename: string
+}
