@@ -16,23 +16,27 @@ export async function migrate() {
 
   const schemaTables = Config.tables.map((t) => `"${t.schema}"."${t.table}"`)
 
-  // Check if publication exists and get its current tables
-  const pubResult = await client.query<TablePublication>(`
-    SELECT
-      schemaname,
-      tablename
-    FROM pg_publication_tables
-    WHERE pubname = $1
+  // Check if publication exists
+  const pubExists = await client.query(`
+    SELECT oid FROM pg_publication WHERE pubname = $1
   `, [
     Config.postgres.pubName,
   ]);
 
   // Publication does not exist — create it
-  if (pubResult.rowCount === 0) {
+  if (pubExists.rowCount === 0) {
     await client.query(`CREATE PUBLICATION ${Config.postgres.pubName} FOR TABLE ${schemaTables}`);
     Logger.info({ pubName: Config.postgres.pubName, tables: schemaTables }, 'publication created');
-  } else {
-    // Publication exists — check if table list differs
+  }
+
+  // Publication exists — check if table list differs
+  if (pubExists.rowCount === 1) {
+    const pubResult = await client.query<TablePublication>(`
+      SELECT schemaname, tablename
+      FROM pg_publication_tables
+      WHERE pubname = $1
+    `, [Config.postgres.pubName]);
+
     const existingTables = new Set(pubResult.rows.map((r) => `"${r.schemaname}"."${r.tablename}"`));
     const desiredTables = new Set(schemaTables);
 
