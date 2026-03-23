@@ -16,6 +16,12 @@ export async function migrate() {
 
   const schemaTables = Config.tables.map((t) => `"${t.schema}"."${t.table}"`)
 
+  // Set REPLICA IDENTITY FULL for each table
+  for (const table of schemaTables) {
+    await client.query(`ALTER TABLE ${table} REPLICA IDENTITY FULL`);
+  }
+  Logger.info({ tables: schemaTables }, 'replica identity set to full');
+
   // Check if publication exists
   const pubExists = await client.query(`
     SELECT oid FROM pg_publication WHERE pubname = $1
@@ -47,12 +53,6 @@ export async function migrate() {
       const tables = toAdd.join(',');
       await client.query(`ALTER PUBLICATION "${Config.postgres.pubName}" ADD TABLE ${tables}`);
       Logger.info({ pub_name: Config.postgres.pubName, tables: toAdd }, 'publication tables added');
-
-      // Set REPLICA IDENTITY FULL for each table
-      for (const table of schemaTables) {
-        await client.query(`ALTER TABLE ${table} REPLICA IDENTITY FULL`);
-      }
-      Logger.info({ tables: schemaTables }, 'replica identity set to full');
     }
 
     if (toDrop.length > 0) {
