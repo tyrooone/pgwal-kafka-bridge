@@ -61,40 +61,44 @@ const isShouldSendToTarget = (params: {
 //
 // Process replication event
 //
-Replication.on('data', async (_, msg) => {
-  if (msg.tag !== 'insert' && msg.tag !== 'update' && msg.tag !== 'delete') return;
+Replication.on('data', async (lsn, msg) => {
+  if (msg.tag === 'insert' || msg.tag === 'update' || msg.tag === 'delete') {
+    const tableConfig = Config.tables.find((t) => t.schema === msg.relation.schema && t.table === msg.relation.name);
 
-  const tableConfig = Config.tables.find((t) => t.schema === msg.relation.schema && t.table === msg.relation.name);
-  if (!tableConfig) return;
+    if (tableConfig) {
+      const row = msg.new ?? msg.old;
 
-  const row = msg.new ?? msg.old;
+      const payload = JSON.stringify({
+        schema: msg.relation.schema,
+        table: msg.relation.name,
+        operation: msg.tag,
+        row,
+      });
 
-  const payload = JSON.stringify({
-    schema: msg.relation.schema,
-    table: msg.relation.name,
-    operation: msg.tag,
-    row,
-  });
+      const matchedTargets = tableConfig.targets.filter((t) => isShouldSendToTarget({
+        target: t,
+        tag: msg.tag,
+        new: msg.new,
+        old: msg.old,
+      }));
 
-  const matchedTargets = tableConfig.targets.filter((t) => isShouldSendToTarget({
-    target: t,
-    tag: msg.tag,
-    new: msg.new,
-    old: msg.old,
-  }));
-  if (matchedTargets.length === 0) return;
+      if (matchedTargets.length > 0) {
+        for (const target of matchedTargets) {
+          const ok = producerStream.write({
+            topic: target.topic,
+            key: String(row[target.partitionKey]),
+            value: payload,
+          });
 
-  for (const target of matchedTargets) {
-    const ok = producerStream.write({
-      topic: target.topic,
-      key: String(row[target.partitionKey]),
-      value: payload,
-    });
-
-    if (!ok) {
-      await new Promise<void>((resolve) => producerStream.once('drain', resolve));
+          if (!ok) {
+            await new Promise<void>((resolve) => producerStream.once('drain', resolve));
+          }
+        }
+      }
     }
   }
+
+  Replication.acknowledge(lsn)
 });
 
 //
