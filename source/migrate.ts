@@ -1,8 +1,8 @@
-import { Admin } from '@platformatic/kafka';
 import { Client } from 'pg';
 import { unique } from 'radash';
 import { Config } from './config.ts';
 import { Logger } from './logger.ts';
+import { Admin } from './kafka.ts';
 import { PostgresConfig } from './postgres.ts';
 import type { TablePublication } from './types.ts';
 
@@ -79,27 +79,16 @@ export async function migrate() {
     Logger.info({ slot_name: Config.postgres.slotName }, 'replication slot exists');
   }
 
-  // Create Kafka topics (outside transaction)
-  const admin = new Admin({
-    clientId: 'pgwal-bridge-admin',
-    bootstrapBrokers: Config.kafka.brokers,
-    sasl: {
-      mechanism: 'PLAIN',
-      username: Config.kafka.username,
-      password: Config.kafka.password,
-    },
-  });
-
   try {
     const configTopics = unique(Config.tables.flatMap((t) => t.targets.map((tg) => tg.topic)));
-    const brokerTopics = await admin.listTopics();
+    const brokerTopics = await Admin.listTopics();
 
     const existingTopics = new Set(brokerTopics);
     const desiredTopics = new Set(configTopics)
 
     const toCreate = Array.from(desiredTopics.difference(existingTopics));
     if (toCreate.length > 0) {
-      await admin.createTopics({
+      await Admin.createTopics({
         topics: toCreate,
         partitions: Config.kafka.partitions,
         replicas: -1,
@@ -109,6 +98,6 @@ export async function migrate() {
       Logger.info({ topics: brokerTopics }, 'kafka topics up to date');
     }
   } finally {
-    await admin.close();
+    await Admin.close();
   }
 }

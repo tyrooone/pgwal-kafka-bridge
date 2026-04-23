@@ -4,6 +4,7 @@ import type { ClientConfig } from 'pg';
 
 export const PostgresConfig: ClientConfig = {
   connectionString: Config.postgres.url,
+  connectionTimeoutMillis: Config.postgres.timeout,
 }
 if (typeof Config.postgres.reject === 'boolean') {
   PostgresConfig.ssl = {
